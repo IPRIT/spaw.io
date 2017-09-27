@@ -1,0 +1,44 @@
+<div class="score-table" ng-controller="ScoreTableCtrl as vm">
+
+  <div class="score-table__tabs-wrap">
+    <div class="score-table__tabs">
+      <div class="score-table__tab mobile" ng-init="vm.ngTouchLocal = false" ng-touchstart="vm.ngTouchLocal = true; vm.selectTab('local')" ng-touchend="vm.ngTouchLocal = false" ng-class="{'score-table__tab_selected': vm.selectedTable === 'local', 'ng-touch-started': vm.ngTouchLocal}">Local leaderboard</div>
+      <div class="score-table__tab desktop" ng-click="vm.selectTab('local')" ng-class="{'score-table__tab_selected': vm.selectedTable === 'local'}">Local leaderboard</div>
+
+      <div class="score-table__tab mobile" ng-init="vm.ngTouchGlobal = false" ng-touchstart="vm.ngTouchGlobal = true; vm.selectTab('global')" ng-touchend="vm.ngTouchGlobal = false" ng-class="{'score-table__tab_selected': vm.selectedTable === 'global', 'ng-touch-started': vm.ngTouchGlobal}">World leaderboard</div>
+      <div class="score-table__tab desktop" ng-click="vm.selectTab('global')" ng-class="{'score-table__tab_selected': vm.selectedTable === 'global'}">World leaderboard</div>
+    </div>
+  </div>
+
+  <div class="score-table__board">
+    <div ng-if="!vm.scores.length" class="score-table__no-scores">Nothing to show. Waiting for your records!</div>
+    <div class="score-table__news" ng-if="vm.selectedTable === 'global' && vm.scores.length">World's scores last updated at {{vm.lastUpdate | date:'shortTime'}}</div>
+
+    <div>
+      <div class="score-table__item" ng-repeat="score in vm.scores track by $index">
+        <div class="score-table__item-rate">
+          <span ng-bind="$index + 1"></span>
+          <div class="score-table__item-image desktop"></div>
+        </div>
+        <a target="_blank" class="score-table__item-name" ng-href="{{score.username ? '' : ''}}">
+        <span>
+          <span data-user-id="{{score.id}}" title="Not an easter egg"></span>
+          <span ng-if="score.id === me.from_id" class="you" title="Your score"></span>
+          <span ng-bind="score.viewName"></span>
+          <span ng-if="score.username">
+            <span class="score-table__item-username">(@{{score.username}})</span>
+          </span>
+        </span>
+        </a>
+        <div class="score-table__item-score">
+          <div class="score-table__item-score-chicken-image"></div>
+          <div class="score-table__item-score-number" ng-bind="score.score"></div>
+        </div>
+      </div>
+    </div>
+    <div class="score-table__board_loading" ng-show="vm.isLoading">
+      <div class="rotating-chicken"></div>
+      <span>Loading...</span>
+    </div>
+  </div>
+</div>

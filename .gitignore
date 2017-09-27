@@ -1,0 +1,7 @@
+# IntelliJ project files
+.idea
+.editorconfig
+node_modules
+yarn.lock
+dist/core
+2dist/resources
