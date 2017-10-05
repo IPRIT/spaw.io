@@ -40,6 +40,7 @@
     "one-encryption": "^2.7.1",
     "phaser": "^2.6.2",
     "pixi.js": "4.5.1",
+    "socket.io": "^2.0.3",
     "type-check": "^0.3.2"
   },
   "devDependencies": {

@@ -5,6 +5,7 @@ import Promise from 'bluebird';
 import EventEmitter from 'events';
 import * as Phaser from 'phaser';
 import { StarsBackground } from "./lib/background/stars";
+import { SocketIoManager } from "./lib/api";
 
 export const GameState = {
   not_init: 2,
@@ -15,6 +16,9 @@ export const GameState = {
 
 export class Game extends EventEmitter {
 
+  /**
+   * @type {number}
+   */
   gameState = GameState.started;
 
   /**
@@ -35,6 +39,10 @@ export class Game extends EventEmitter {
    */
   _worldGroup = null;
 
+  /**
+   * @type {number}
+   * @private
+   */
   _worldScale = 1;
 
   /**
@@ -50,6 +58,7 @@ export class Game extends EventEmitter {
   init() {
     this._createGameInstance();
     this._attachEvents();
+    this._createSocketApi();
   }
   
   start() {
@@ -65,10 +74,16 @@ export class Game extends EventEmitter {
     // todo: free memory
   }
 
+  /**
+   * @return {number}
+   */
   getFPS() {
     return this._gameInstance.time.fps;
   }
 
+  /**
+   * @private
+   */
   _createGameInstance() {
     this._gameInstance = new Phaser.Game('100', '100', Phaser.AUTO, 'space-game', {
       preload: this._preload.bind(this),
@@ -79,10 +94,11 @@ export class Game extends EventEmitter {
   }
 
   _preload() {
-    //this._gameInstance.load.image('background','resources/bg/1/bg-04.png');
-    //this._gameInstance.load.image('player', 'resources/models/foxy/died/foxy-died.png');
   }
 
+  /**
+   * @private
+   */
   _create() {
     let game = this._gameInstance;
     game.time.advancedTiming = true;
@@ -138,9 +154,6 @@ export class Game extends EventEmitter {
     if (this.isGamePaused) {
       return;
     }
-    let game = this._gameInstance;
-    let player = this._player;
-    let cursors = this._cursors;
 
     this._handlePlayerMovements();
     this._handleZooming();
@@ -148,6 +161,9 @@ export class Game extends EventEmitter {
     this._stars.callAll('_moveForward');
   }
 
+  /**
+   * @private
+   */
   _handlePlayerMovements() {
     let game = this._gameInstance;
     let player = this._player;
@@ -185,6 +201,9 @@ export class Game extends EventEmitter {
     this._stars.keepInView(this._worldScale);
   }
 
+  /**
+   * @private
+   */
   _handleZooming() {
     let game = this._gameInstance;
     const zoomDelta = .01;
@@ -203,6 +222,9 @@ export class Game extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   _render() {
     let game = this._gameInstance;
     if (game.input.keyboard.isDown(Phaser.KeyCode.L)) {
@@ -215,9 +237,32 @@ export class Game extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   _attachEvents() {
     window.addEventListener('resize', this._resize.bind(this));
     this._resize();
+  }
+
+  /**
+   * @private
+   */
+  _createSocketApi() {
+    let socketIoManager = SocketIoManager.getInstance();
+    socketIoManager.socket.on('world.newObjects', data => {
+      let objects = data.objects;
+      let game = this._gameInstance;
+      objects.forEach(object => {
+        if (object.type === 'feed') {
+          let feed = game.add.graphics(0, 0, this._worldGroup);
+          feed.lineStyle(1, 0xff0000, 1);
+          feed.beginFill(0xff0000);
+          feed.drawCircle(object.state.pos.x, object.state.pos.y, object.radius * 2);
+          feed.endFill();
+        }
+      });
+    });
   }
 
   _resize() {
