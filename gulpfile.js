@@ -27,6 +27,7 @@ gulp.task('build:js', [ 'build:es6-commonjs' ], function() {
     gulp.src([
       //'./node_modules/pixi.js/dist/pixi.min.js',
       //'./node_modules/phaser/build/phaser.min.js',
+      './node_modules/regenerator-runtime/runtime.js'
     ]),//.pipe(uglify()),
     browserify('./dist/core/temp/main.js')
       .bundle()

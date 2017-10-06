@@ -1,1 +1,1 @@
-export * from './socket-api';
+export * from './api';
