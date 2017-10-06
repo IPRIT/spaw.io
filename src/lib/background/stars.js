@@ -5,57 +5,27 @@ import { Star } from "./star";
 
 export class StarsBackground extends Phaser.Group {
 
-  /**
-   * @type {Phaser.Group}
-   * @private
-   */
-  _worldGroup = null;
-
-  _starRadius = 15;
+  _starRadius = 20;
   _starMaxScale = 1;
   _starMinScale = .1;
 
-  _starsNumberInQuad = 2;
-  _quadsNumber = 5;
-
   _maxStarsNumber = 50;
 
-  constructor(game, parentGroup) {
-    super(game, parentGroup);
-    this._worldGroup = parentGroup;
+  constructor(game) {
+    super(game);
+    this.fixedToCamera = true;
+    console.log(this);
   }
 
   initialize() {
-    let game = this.game;
-    this._worldGroup.sendToBack(this);
+    if (this.parent) {
+      this.parent.sendToBack(this);
+    }
     this.createStars();
   }
 
-  createStars(worldScale = this._worldGroup.scale.x) {
-    let game = this.game;
-    let [ cameraWidth, cameraHeight ] = [ game.camera.width, game.camera.height ];
-    let actualWorldViewWidth = cameraWidth / worldScale;
-    let actualWorldViewHeight = cameraHeight / worldScale;
-
-    let blockRowSize = actualWorldViewWidth / this._quadsNumber;
-    let blockColumnSize = actualWorldViewHeight / this._quadsNumber;
-
-    for (let blockNumberY = 1; blockNumberY <= this._quadsNumber; ++blockNumberY) {
-      let blockStartsY = blockColumnSize * (blockNumberY - 1) + game.camera.view.y / worldScale;
-      for (let blockNumberX = 1; blockNumberX <= this._quadsNumber; ++blockNumberX) {
-        let blockStartsX = blockRowSize * (blockNumberX - 1) + game.camera.view.x / worldScale;
-        //let rectZone = new Phaser.Rectangle(blockStartsX, blockStartsY, blockRowSize, blockColumnSize);
-        for (let times = 0; times < this._starsNumberInQuad; ++times) {
-          this.createStar(
-            new Phaser.Point(
-              blockStartsX + game.rnd.realInRange(0, blockRowSize),
-              blockStartsY + game.rnd.realInRange(0, blockColumnSize)
-            ),
-            game.rnd.realInRange(this._starMinScale, this._starMaxScale)
-          );
-        }
-      }
-    }
+  createStars() {
+    this.updateStars();
   }
 
   createStar(point, farScale) {
@@ -68,8 +38,9 @@ export class StarsBackground extends Phaser.Group {
       .to({ alpha: 1 }, 200, Phaser.Easing.Cubic.InOut, true);
   }
 
-  updateStars(worldScale = this._worldGroup.scale.x) {
+  updateStars() {
     let game = this.game;
+    let scale = this.scale.x;
     let cameraBounds = this._getCameraBounds();
     let stars = this.children;
 
@@ -77,19 +48,20 @@ export class StarsBackground extends Phaser.Group {
     let maxStarRadius = this._starRadius;
     let minStarRadius = (this._starRadius * .1 ) / (
       decreaseScale + (1 - decreaseScale)
-      * (worldScale - settings.minZoomScaling) / (settings.maxZoomScaling - settings.minZoomScaling)
+      * (scale - settings.minZoomScaling) / (settings.maxZoomScaling - settings.minZoomScaling)
     );
     if (minStarRadius > maxStarRadius) {
       minStarRadius = maxStarRadius;
     }
     let maxStarsNumber = this._maxStarsNumber / (
       decreaseScale + (1 - decreaseScale)
-      * (worldScale - settings.minZoomScaling) / (settings.maxZoomScaling - settings.minZoomScaling)
+      * (scale - settings.minZoomScaling) / (settings.maxZoomScaling - settings.minZoomScaling)
     );
 
+    let rect = new Phaser.Rectangle(0, 0, cameraBounds.width, cameraBounds.height);
     for (let starIndex = 0; starIndex < stars.length; ++starIndex) {
       let star = stars[ starIndex ];
-      if (!cameraBounds.contains( star.x, star.y )
+      if (!rect.contains( star.x, star.y )
         || star._radius < minStarRadius
         || star._radius > maxStarRadius) {
         stars.splice(starIndex, 1);
@@ -101,31 +73,37 @@ export class StarsBackground extends Phaser.Group {
     for (let times = 0; times < starsNeeded; ++times) {
       this.createStar(
         new Phaser.Point(
-          cameraBounds.x + game.rnd.realInRange(0, cameraBounds.width),
-          cameraBounds.y + game.rnd.realInRange(0, cameraBounds.height)
+          game.rnd.realInRange(0, cameraBounds.width),
+          game.rnd.realInRange(0, cameraBounds.height)
         ),
         game.rnd.realInRange(minStarRadius / maxStarRadius, this._starMaxScale)
       );
     }
   }
 
-  keepInView(worldScale = this._worldGroup.scale.x) {
-    let game = this.game;
-    let cameraBounds = this._getCameraBounds();
+  /**
+   * @param {number} scale
+   */
+  setScale(scale) {
+    this.scale.set( scale, scale );
+  }
 
+  keepInView() {
+    let cameraBounds = this._getCameraBounds();
+    let view = new Phaser.Rectangle(0, 0, cameraBounds.width, cameraBounds.height);
     for (let index = 0; index < this.children.length; ++index) {
       let item = this.children[ index ];
-      if (item.x > cameraBounds.x + cameraBounds.width + 5) {
-        item.x = cameraBounds.x;
+      if (item.x > view.x + view.width + 5) {
+        item.x = view.x;
       }
-      if (item.x < cameraBounds.x + -item.width - 5) {
-        item.x = cameraBounds.x + cameraBounds.width;
+      if (item.x < view.x + -item.width - 5) {
+        item.x = view.x + view.width;
       }
-      if (item.y > cameraBounds.y + cameraBounds.height + 5) {
-        item.y = cameraBounds.y;
+      if (item.y > view.y + view.height + 5) {
+        item.y = view.y;
       }
-      if (item.y < cameraBounds.y + -item.height - 5) {
-        item.y = cameraBounds.y + cameraBounds.height;
+      if (item.y < view.y + -item.height - 5) {
+        item.y = view.y + view.height;
       }
     }
   }
@@ -137,33 +115,25 @@ export class StarsBackground extends Phaser.Group {
     }
   }
 
-  animateMoveStars(shiftX, shiftY, duration) {
-    let game = this.game;
+  moveStarsSimple(shiftX, shiftY) {
     for (let index = 0; index < this.children.length; ++index) {
       let item = this.children[ index ];
-      let tween = game.add.tween(item)
-        .to(
-          item.position.clone().add(shiftX * (1 - item._scale), shiftY * (1 - item._scale)),
-          duration, Phaser.Easing.Cubic.InOut, true
-        );
-      tween.onUpdateCallback(() => {
-        this.keepInView();
-      });
+      item.position.add(shiftX, shiftY);
     }
   }
 
   /**
-   * @param {number} worldScale
    * @return {Phaser.Rectangle}
    * @private
    */
-  _getCameraBounds(worldScale = this._worldGroup.scale.x) {
+  _getCameraBounds() {
     let game = this.game;
+    let scale = this.scale.x;
     let [ cameraWidth, cameraHeight ] = [ game.camera.width, game.camera.height ];
-    let actualWorldViewWidth = cameraWidth / worldScale;
-    let actualWorldViewHeight = cameraHeight / worldScale;
-    let cameraXOffset = game.camera.view.x / worldScale;
-    let cameraYOffset = game.camera.view.y / worldScale;
-    return new Phaser.Rectangle(cameraXOffset, cameraYOffset, actualWorldViewWidth, actualWorldViewHeight);
+    let actualWorldViewWidth = cameraWidth / scale;
+    let actualWorldViewHeight = cameraHeight / scale;
+    let cameraXOffset = game.camera.view.x / scale;
+    let cameraYOffset = game.camera.view.y / scale;
+    return new Phaser.Rectangle( cameraXOffset, cameraYOffset, actualWorldViewWidth, actualWorldViewHeight );
   }
 }

@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import * as utils from "../../utils";
 
 export class Player extends Phaser.Group {
 

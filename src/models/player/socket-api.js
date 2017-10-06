@@ -31,9 +31,7 @@ export class PlayerSocketApi {
    * @param {number} traction
    */
   directPlayerTo( direction, traction ) {
-    this._socket.emit('player.move', {
-      direction, traction
-    });
+    this._socket.emit('player.move', [ direction.x, direction.y, traction ]);
   }
 
   directPlayerToThrottled = throttle(this.directPlayerTo.bind(this), 100);
@@ -48,7 +46,7 @@ export class PlayerSocketApi {
   }
 
   _changeCurrentPlayerPosition(data) {
-    let [ x, y, vx, vy, dt ] = data;
+    let [ x, y, /*vx, vy,*/ dt ] = data;
     if (!this._player.hasBody) {
       return;
     }
@@ -56,7 +54,6 @@ export class PlayerSocketApi {
     game.add.tween(this._player.position).to({ x, y }, dt + 50, 'Linear', true);
     this._player.state.pos.x = x;
     this._player.state.pos.y = y;
-    //console.log(x, y);
     //this._player.playerBody.velocity.set( 2000 * vx, 2000 * vy );
     //this._player.state.vel.x = vx;
     //this._player.state.vel.y = vy;

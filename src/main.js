@@ -1,3 +1,4 @@
+import './utils/polyfills';
 import ds from 'fm-localstorage';
 import { Game } from "./game";
 import { SocketIoManager } from "./lib/socket.io/socket-manager";

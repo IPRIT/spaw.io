@@ -62,8 +62,8 @@ export class PlayerControls {
    */
   _getDirection({ x, y }) {
     let mousePoint = new Phaser.Point(x, y);
-    let screenCenter = this._getScreenCenter();
-    return mousePoint.subtract( screenCenter.x, screenCenter.y ).normalize();
+    let anchorPoint = this._getAnchorPoint();
+    return mousePoint.subtract( anchorPoint.x, anchorPoint.y ).normalize();
   }
 
   /**
@@ -74,19 +74,19 @@ export class PlayerControls {
   _getTraction({ x, y }) {
     let screenSize = this._getScreenSize();
     let maxPossibleRadius = Math.min(screenSize.width, screenSize.height) / 2;
-    const liveAreaRatio = .7;
+    const liveAreaRatio = .6;
     let liveAreaRadius = maxPossibleRadius * liveAreaRatio;
     let mousePoint = new Phaser.Point(x, y);
-    return Math.min( mousePoint.distance( this._getScreenCenter() ), liveAreaRadius ) / liveAreaRadius;
+    return Math.min( mousePoint.distance( this._getAnchorPoint() ), liveAreaRadius ) / liveAreaRadius;
   }
 
   /**
    * @return {Phaser.Point}
    * @private
    */
-  _getScreenCenter() {
-    let screenSize = this._getScreenSize();
-    return new Phaser.Point(screenSize.width / 2, screenSize.height / 2);
+  _getAnchorPoint() {
+    let worldPosition = this.me.worldPosition;
+    return new Phaser.Point(worldPosition.x, worldPosition.y);
   }
 
   /**

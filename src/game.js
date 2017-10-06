@@ -123,7 +123,8 @@ export class Game extends EventEmitter {
    * @private
    */
   _createGameInstance() {
-    this._gameInstance = new Phaser.Game('100', '100', Phaser.AUTO, 'space-game', {
+    let optimalSize = this.optimalGameSize;
+    this._gameInstance = new Phaser.Game(optimalSize.width, optimalSize.height, Phaser.AUTO, 'space-game', {
       preload: this._preload.bind(this),
       create: this._create.bind(this),
       update: this._update.bind(this),
@@ -149,7 +150,7 @@ export class Game extends EventEmitter {
 
     this._cursors = game.input.keyboard.createCursorKeys();
 
-    game.scale.scaleMode = Phaser.ScaleManager.RESIZE;
+    game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
     game.scale.setResizeCallback(() => this._resize(), game);
     game.scale.pageAlignHorizontally = true;
     game.scale.pageAlignVertically = true;
@@ -173,11 +174,11 @@ export class Game extends EventEmitter {
     if (this._player) {
       this._player.playerControls.update();
 
-      if (this._player.hasBody && this._frames > 100) {
+      if (this._player.hasBody && this._frames > 10) {
         let direction = this._player.playerControls._getDirection( game.input );
         let traction = this._player.playerControls._getTraction( game.input );
-        let shiftX = 2 * -direction.x * traction;
-        let shiftY = 2 * -direction.y * traction;
+        let shiftX = 8 * -direction.x * traction;
+        let shiftY = 8 * -direction.y * traction;
         if (this._isPlayerCollidesWithTopBottomBounds()
           || this._isCameraReachedTopBottomBounds()) {
           shiftY = 0;
@@ -187,7 +188,7 @@ export class Game extends EventEmitter {
           shiftX = 0;
         }
         starsBackground.moveStars(shiftX, shiftY);
-        starsBackground.keepInView( this._worldScale );
+        starsBackground.keepInView();
       }
     }
   }
@@ -211,7 +212,8 @@ export class Game extends EventEmitter {
     let worldSize = this._worldSize = new Phaser.Rectangle(
       bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY
     );
-    game.add.tileSprite(worldSize.x, worldSize.y, worldSize.width, worldSize.height, this._createBackgroundColor());
+    this._createBackgroundColor();
+    //game.add.tileSprite(worldSize.x, worldSize.y, worldSize.width, worldSize.height, this._createBackgroundColor() );
     game.world.setBounds(worldSize.x, worldSize.y, worldSize.width, worldSize.height);
     this._worldGroup = game.add.group();
     this._drawWorldBounds( this._worldGroup );
@@ -233,8 +235,8 @@ export class Game extends EventEmitter {
    * @private
    */
   _createStarsBackground() {
-    this._starsBackground = new StarsBackground(this._gameInstance, this._worldGroup);
-    setTimeout(() => this._starsBackground.initialize());
+    this._starsBackground = new StarsBackground(this._gameInstance);
+    setTimeout(() => this._starsBackground.initialize(), 100);
   }
 
   /**
@@ -255,47 +257,6 @@ export class Game extends EventEmitter {
   /**
    * @private
    */
-  _handlePlayerMovements() {
-    if (!this._player || !this._player.hasBody) {
-      return;
-    }
-    let game = this._gameInstance;
-    let player = this._player;
-    let cursors = this._cursors;
-
-    if (cursors.up.isDown) {
-      player.playerBody.moveUp(600);
-      if (!this._isPlayerCollidesWithTopBottomBounds()
-        && !this._isCameraReachedTopBottomBounds()) {
-        this._starsBackground.moveStars(0, -10);
-      }
-    } else if (cursors.down.isDown) {
-      player.playerBody.moveDown(600);
-      if (!this._isPlayerCollidesWithTopBottomBounds()
-        && !this._isCameraReachedTopBottomBounds()) {
-        this._starsBackground.moveStars(0, 10);
-      }
-    }
-
-    if (cursors.left.isDown) {
-      player.playerBody.moveLeft(600);
-      if (!this._isPlayerCollidesWithLeftRightBounds()
-        && !this._isCameraReachedLeftRightBounds()) {
-        this._starsBackground.moveStars(-10, 0);
-      }
-    } else if (cursors.right.isDown) {
-      player.playerBody.moveRight(600);
-      if (!this._isPlayerCollidesWithLeftRightBounds()
-        && !this._isCameraReachedLeftRightBounds()) {
-        this._starsBackground.moveStars(10, 0);
-      }
-    }
-    this._starsBackground.keepInView(this._worldScale);
-  }
-
-  /**
-   * @private
-   */
   _handleZooming() {
     let game = this._gameInstance;
     const zoomDelta = .01;
@@ -309,8 +270,11 @@ export class Game extends EventEmitter {
     }
     if (Math.abs(previousZoom - this._worldScale) > 1e-7) {
       this._worldGroup.scale.setTo(this._worldScale, this._worldScale);
+      this._starsBackground.setScale( this._worldScale );
       //game.camera.setBoundsToWorld();
-      this._starsBackground.updateStars(this._worldScale);
+      let delta = previousZoom - this._worldScale;
+      this._starsBackground.moveStarsSimple(delta * game.camera.width / this._worldScale, delta * game.camera.width / this._worldScale);
+      this._starsBackground.updateStars();
     }
   }
 
@@ -336,47 +300,47 @@ export class Game extends EventEmitter {
   _attachEvents() {
     window.addEventListener('resize', this._resize.bind(this));
     this._resize();
+    this._gameInstance.onPause.add(() => {
+      this._gameInstance.paused = this.isGamePaused;
+    });
   }
 
   _resize() {
-  }
-
-  _animateZoomTo(scale, duration = 100) {
     let game = this._gameInstance;
-    return game.add.tween(this._worldGroup.scale).to({
-      x: scale,
-      y: scale
-    }, duration, Phaser.Easing.Cubic.InOut, true);
+    game.paused = this.isGamePaused;
+    let optimalSize = this.optimalGameSize;
+    game.scale.setGameSize(optimalSize.width, optimalSize.height);
+    game.scale.refresh();
   }
 
   _isPlayerCollidesWithTopBottomBounds() {
     let player = this._player;
     let playerHeight = this._player.height;
     let worldSize = this._worldSize;
-    return player.y + playerHeight / 2 >= worldSize.y + worldSize.height
-      || player.y - playerHeight / 2 <= worldSize.y;
+    return player.y + playerHeight / 2 >= worldSize.y + worldSize.height - 40
+      || player.y - playerHeight / 2 <= worldSize.y + 40;
   }
 
   _isPlayerCollidesWithLeftRightBounds() {
     let player = this._player;
     let playerWidth = this._player.width;
     let worldSize = this._worldSize;
-    return player.x + playerWidth / 2 >= worldSize.x + worldSize.width
-      || player.x - playerWidth / 2 <= worldSize.x;
+    return player.x + playerWidth / 2 >= worldSize.x + worldSize.width - 40
+      || player.x - playerWidth / 2 <= worldSize.x + 40;
   }
 
   _isCameraReachedTopBottomBounds() {
     let camera = this._gameInstance.camera;
     let worldSize = this._worldSize;
-    return camera.y <= worldSize.y
-      || camera.y + camera.height >= worldSize.y + worldSize.height;
+    return camera.y <= worldSize.y + 40
+      || camera.y + camera.height >= worldSize.y + worldSize.height - 40;
   }
 
   _isCameraReachedLeftRightBounds() {
     let camera = this._gameInstance.camera;
     let worldSize = this._worldSize;
-    return camera.x <= worldSize.x
-      || camera.x + camera.width >= worldSize.x + worldSize.width;
+    return camera.x <= worldSize.x + 40
+      || camera.x + camera.width >= worldSize.x + worldSize.width - 40;
   }
 
   /**
@@ -440,5 +404,38 @@ export class Game extends EventEmitter {
    */
   get worldScale() {
     return this._worldScale;
+  }
+
+  /**
+   * @return {number}
+   */
+  get screenWidth() {
+    return window.innerWidth;
+  }
+
+  /**
+   * @return {number}
+   */
+  get screenHeight() {
+    return window.innerHeight;
+  }
+
+  /**
+   * @return {{width: number, height: number}}
+   */
+  get optimalGameSize() {
+    const maxSideSize = 2000;
+    let width = this.screenWidth;
+    let height = this.screenHeight;
+    let ratio = width / height;
+    if (width > height) {
+      width = maxSideSize;
+      height = width / ratio;
+    } else {
+      ratio = height / width;
+      height = maxSideSize;
+      width = height / ratio;
+    }
+    return { width, height };
   }
 }

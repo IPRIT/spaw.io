@@ -55,7 +55,7 @@ export class MyPlayer extends Player {
     game.physics.p2.enable(this.playerTriangle);
     game.camera.follow(this, Phaser.Camera.FOLLOW_LOCKON, .5, .5);
     setTimeout(() => {
-      this.gameClassInstance.starsBackground.updateStars( this.gameClassInstance.worldScale );
+      this.gameClassInstance.starsBackground.updateStars();
       game.camera.lerp.set(1, 1);
     }, 300)
   }
