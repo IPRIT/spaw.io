@@ -5,7 +5,7 @@ import { Star } from "./star";
 
 export class StarsBackground extends Phaser.Group {
 
-  _starRadius = 20;
+  _starRadius = 10;
   _starMaxScale = 1;
   _starMinScale = .1;
 
@@ -35,7 +35,7 @@ export class StarsBackground extends Phaser.Group {
     star.y = point.y;
     star.alpha = 0;
     game.add.tween(star)
-      .to({ alpha: 1 }, 200, Phaser.Easing.Cubic.InOut, true);
+      .to({ alpha: 1 }, 200, Phaser.Easing.Quadratic.InOut, true);
   }
 
   updateStars() {
@@ -85,7 +85,9 @@ export class StarsBackground extends Phaser.Group {
    * @param {number} scale
    */
   setScale(scale) {
-    this.scale.set( scale, scale );
+    this._scale = scale;
+    this.game.add.tween(this.scale)
+      .to({ x: scale, y: scale }, 300, 'Linear', true);
   }
 
   keepInView() {
@@ -111,14 +113,7 @@ export class StarsBackground extends Phaser.Group {
   moveStars(shiftX, shiftY) {
     for (let index = 0; index < this.children.length; ++index) {
       let item = this.children[ index ];
-      item.position.add(shiftX * item._scale, shiftY * item._scale);
-    }
-  }
-
-  moveStarsSimple(shiftX, shiftY) {
-    for (let index = 0; index < this.children.length; ++index) {
-      let item = this.children[ index ];
-      item.position.add(shiftX, shiftY);
+      item.position.add(shiftX * item._scale * this._scale, shiftY * item._scale * this._scale);
     }
   }
 

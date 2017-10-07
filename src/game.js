@@ -1,13 +1,11 @@
 import * as settings from "./config";
-import * as utils from "./utils";
 import 'ion-sound';
-import Promise from 'bluebird';
 import EventEmitter from 'events';
 import * as Phaser from 'phaser';
 import { StarsBackground } from "./lib/background/stars";
-import { SocketIoManager } from "./lib/socket.io";
 import * as Api from './lib/api';
-import { MyPlayer } from "./models/player/my-player";
+import { MyPlayer } from "./models/player";
+import { FeedsGroup } from "./models/feeds";
 
 export const GameState = {
   not_init: 2,
@@ -48,6 +46,12 @@ export class Game extends EventEmitter {
   _worldGroup = null;
 
   /**
+   * @type {FeedsGroup}
+   * @private
+   */
+  _feedsGroup = null;
+
+  /**
    * @type {number}
    * @private
    */
@@ -80,6 +84,7 @@ export class Game extends EventEmitter {
     this._gameStatus = gameStatus;
     this._createWorld( gameStatus );
     this._createStarsBackground();
+    this._createFeedsLayer();
     this._attachEvents();
   }
   
@@ -117,6 +122,27 @@ export class Game extends EventEmitter {
   createMe(socket, session, faction) {
     this._player = new MyPlayer(this._gameInstance, this._worldGroup, { socket, session, faction });
     return this._player;
+  }
+
+  /**
+   * @param {number} scale
+   */
+  zoomToScale( scale ) {
+    console.log(scale);
+    const maxZoom = settings.maxZoomScaling;
+    const minZoom = settings.minZoomScaling;
+    let previousZoom = this._worldScale;
+    this._worldScale = Phaser.Math.clamp(scale, minZoom, maxZoom);
+    if (Math.abs(previousZoom - this._worldScale) > 1e-7) {
+      let game = this.game;
+      let tweenFirst = game.add.tween(this._worldGroup.scale)
+        .to({ x: this._worldScale, y: this._worldScale }, 300, 'Linear', true);
+      this._starsBackground.setScale( this._worldScale );
+      this._starsBackground.keepInView();
+      tweenFirst.onComplete.addOnce(() => {
+        this._starsBackground.updateStars();
+      });
+    }
   }
 
   /**
@@ -163,8 +189,6 @@ export class Game extends EventEmitter {
     }
     this._frames++;
 
-    this._handleZooming();
-
     let starsBackground = this._starsBackground;
     let game = this.game;
 
@@ -172,11 +196,18 @@ export class Game extends EventEmitter {
       starsBackground.callAll('_moveForward');
     }
     if (this._player) {
+      let direction = this._player.playerControls.getDirection( game.input );
+      let traction = this._player.playerControls.getTraction( game.input );
+
       this._player.playerControls.update();
+      this._player.directTo( direction, traction );
+      this._player.viewPlayers.filter(player => {
+        return player.id !== this._player.id;
+      }).forEach(player => {
+        player.updateRotation();
+      });
 
       if (this._player.hasBody && this._frames > 10) {
-        let direction = this._player.playerControls._getDirection( game.input );
-        let traction = this._player.playerControls._getTraction( game.input );
         let shiftX = 8 * -direction.x * traction;
         let shiftY = 8 * -direction.y * traction;
         if (this._isPlayerCollidesWithTopBottomBounds()
@@ -257,25 +288,8 @@ export class Game extends EventEmitter {
   /**
    * @private
    */
-  _handleZooming() {
-    let game = this._gameInstance;
-    const zoomDelta = .01;
-    const maxZoom = settings.maxZoomScaling;
-    const minZoom = settings.minZoomScaling;
-    let previousZoom = this._worldScale;
-    if (game.input.keyboard.isDown(Phaser.KeyCode.NUMPAD_ADD)) {
-      this._worldScale = Phaser.Math.clamp(this._worldScale + zoomDelta, minZoom, maxZoom);
-    } else if (game.input.keyboard.isDown(Phaser.KeyCode.NUMPAD_SUBTRACT)) {
-      this._worldScale = Phaser.Math.clamp(this._worldScale - zoomDelta, minZoom, maxZoom);
-    }
-    if (Math.abs(previousZoom - this._worldScale) > 1e-7) {
-      this._worldGroup.scale.setTo(this._worldScale, this._worldScale);
-      this._starsBackground.setScale( this._worldScale );
-      //game.camera.setBoundsToWorld();
-      let delta = previousZoom - this._worldScale;
-      this._starsBackground.moveStarsSimple(delta * game.camera.width / this._worldScale, delta * game.camera.width / this._worldScale);
-      this._starsBackground.updateStars();
-    }
+  _createFeedsLayer() {
+    this._feedsGroup = new FeedsGroup(this.game, this._worldGroup);
   }
 
   /**
@@ -317,30 +331,30 @@ export class Game extends EventEmitter {
     let player = this._player;
     let playerHeight = this._player.height;
     let worldSize = this._worldSize;
-    return player.y + playerHeight / 2 >= worldSize.y + worldSize.height - 40
-      || player.y - playerHeight / 2 <= worldSize.y + 40;
+    return player.y + playerHeight / 2 >= worldSize.y + worldSize.height - 10
+      || player.y - playerHeight / 2 <= worldSize.y + 10;
   }
 
   _isPlayerCollidesWithLeftRightBounds() {
     let player = this._player;
     let playerWidth = this._player.width;
     let worldSize = this._worldSize;
-    return player.x + playerWidth / 2 >= worldSize.x + worldSize.width - 40
-      || player.x - playerWidth / 2 <= worldSize.x + 40;
+    return player.x + playerWidth / 2 >= worldSize.x + worldSize.width - 10
+      || player.x - playerWidth / 2 <= worldSize.x + 10;
   }
 
   _isCameraReachedTopBottomBounds() {
     let camera = this._gameInstance.camera;
     let worldSize = this._worldSize;
-    return camera.y <= worldSize.y + 40
-      || camera.y + camera.height >= worldSize.y + worldSize.height - 40;
+    return camera.y <= worldSize.y + 10
+      || camera.y + camera.height >= worldSize.y + worldSize.height - 10;
   }
 
   _isCameraReachedLeftRightBounds() {
     let camera = this._gameInstance.camera;
     let worldSize = this._worldSize;
-    return camera.x <= worldSize.x + 40
-      || camera.x + camera.width >= worldSize.x + worldSize.width - 40;
+    return camera.x <= worldSize.x + 10
+      || camera.x + camera.width >= worldSize.x + worldSize.width - 10;
   }
 
   /**
@@ -437,5 +451,19 @@ export class Game extends EventEmitter {
       width = height / ratio;
     }
     return { width, height };
+  }
+
+  /**
+   * @return {Phaser.Rectangle}
+   */
+  get worldSize() {
+    return this._worldSize;
+  }
+
+  /**
+   * @return {FeedsGroup}
+   */
+  get feedsGroup() {
+    return this._feedsGroup;
   }
 }

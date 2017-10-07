@@ -37,8 +37,8 @@ export class PlayerControls {
     if (!this.me.hasBody) {
       return;
     }
-    let direction = this._getDirection( game.input );
-    let traction = this._getTraction( game.input );
+    let direction = this.getDirection( game.input );
+    let traction = this.getTraction( game.input );
     this._directPlayer( direction, traction );
     this._prevInput = new Phaser.Point( game.input.x, game.input.y );
   }
@@ -52,7 +52,7 @@ export class PlayerControls {
     let player = this.me;
     let playerBody = player.playerBody;
     playerBody.rotation = (new Phaser.Point(-1, 0)).angle( direction, true ) * 2;
-    player.socketApi.directPlayerToThrottled( direction, traction );
+    player.socketApi.directPlayerThrottled( direction, traction );
   }
 
   /**
@@ -60,7 +60,7 @@ export class PlayerControls {
    * @param {number} y
    * @return {Phaser.Point}
    */
-  _getDirection({ x, y }) {
+  getDirection({ x, y }) {
     let mousePoint = new Phaser.Point(x, y);
     let anchorPoint = this._getAnchorPoint();
     return mousePoint.subtract( anchorPoint.x, anchorPoint.y ).normalize();
@@ -71,7 +71,7 @@ export class PlayerControls {
    * @param {number} y
    * @return {number}
    */
-  _getTraction({ x, y }) {
+  getTraction({ x, y }) {
     let screenSize = this._getScreenSize();
     let maxPossibleRadius = Math.min(screenSize.width, screenSize.height) / 2;
     const liveAreaRatio = .6;

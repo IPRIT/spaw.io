@@ -34,7 +34,7 @@ export class Player extends Phaser.Group {
   _vertices = [];
 
   /**
-   * @type {{ pos: Phaser.Point, vel: Phaser.Point, acc: Phaser.Point, angular: * }}
+   * @type {{ pos: Phaser.Point, vel: Phaser.Point, acc: Phaser.Point, angular: *, md: {x: number, y: number} }}
    * @private
    */
   _state = null;
@@ -46,6 +46,12 @@ export class Player extends Phaser.Group {
   _playerInfo = null;
 
   /**
+   * @type {{ x: number, y: number }}
+   * @private
+   */
+  _md = { x: 0, y: 0 };
+
+  /**
    * @param game
    * @param parentGroup
    * @param params
@@ -53,7 +59,9 @@ export class Player extends Phaser.Group {
   constructor(game, parentGroup, params) {
     super(game, parentGroup);
     this.enableBody = true;
-    this._faction = params.faction;
+    if (params && params.faction) {
+      this._faction = params.faction;
+    }
   }
 
   /**
@@ -66,6 +74,56 @@ export class Player extends Phaser.Group {
     this._vertices = info.vertices;
     this._state = info.state;
     this._playerInfo = info.playerInfo;
+    this._md = info.md;
+    if (info.playerInfo && info.playerInfo.faction) {
+      this._faction = info.playerInfo.faction;
+    }
+  }
+
+  /**
+   * @param {*} info
+   */
+  updateInfo(info) {
+    this._size = info.size;
+    this._md = info.md;
+    // workaround
+    this._state.angular = info.state.angular;
+    this._playerInfo = info.playerInfo;
+  }
+
+  /**
+   * @param {*} state
+   */
+  setPosition(state) {
+    this._state = state;
+    let game = this.game;
+    game.add.tween(this.position)
+      .to({ x: state.pos.x, y: state.pos.y }, 200, 'Linear', true);
+  }
+
+  /**
+   * Updating rotation
+   */
+  updateRotation() {
+    if (!this.md) {
+      return;
+    }
+    let direction = new Phaser.Point(this.md.x, this.md.y);
+    let game = this.game;
+    let rotation = (new Phaser.Point(-1, 0)).angle( direction, true ) * 2;
+    game.add.tween(this.playerBody)
+      .to({ rotation }, 100, 'Linear', true);
+  }
+
+  /**
+   * Updates player size
+   */
+  updateBodySize() {
+    let size = this.size;
+    let game = this.game;
+    let scale = size / 30;
+    game.add.tween(this.scale)
+      .to({ x: scale, y: scale }, 400, 'Linear', true);
   }
 
   /**
@@ -89,9 +147,8 @@ export class Player extends Phaser.Group {
       this._state.pos.x,
       this._state.pos.y
     );
-    this.playerBody.rotation = this.state.angular.pos;
-    this.playerBody.velocity.x = 60 * this.state.vel.x;
-    this.playerBody.velocity.y = 60 * this.state.vel.y;
+    this.playerBody.rotation = this._state.angular.pos;
+    game.physics.p2.enable(this.playerTriangle);
   }
 
   /**
@@ -112,7 +169,7 @@ export class Player extends Phaser.Group {
    * @return {Phaser.Group}
    */
   get worldGroup() {
-    return this.game.classInstance.worldGroup;
+    return this.gameClassInstance.worldGroup;
   }
 
   /**
@@ -130,10 +187,24 @@ export class Player extends Phaser.Group {
   }
 
   /**
+   * @return {string}
+   */
+  get type() {
+    return this._type;
+  }
+
+  /**
    * @return {{pos: Phaser.Point, vel: Phaser.Point, acc: Phaser.Point, angular: *}}
    */
   get state() {
     return this._state;
+  }
+
+  /**
+   * @return {{x: number, y: number}}
+   */
+  get md() {
+    return this._md;
   }
 
   /**
@@ -155,5 +226,16 @@ export class Player extends Phaser.Group {
    */
   get hasBody() {
     return !!(this.playerTriangle && this.playerBody);
+  }
+
+  /**
+   * @return {number}
+   */
+  get size() {
+    return this._size;
+  }
+
+  destroy() {
+    super.destroy(true);
   }
 }

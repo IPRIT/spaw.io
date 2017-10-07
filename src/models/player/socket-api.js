@@ -1,4 +1,5 @@
 import throttle from "throttleit";
+import * as Phaser from "phaser";
 
 export class PlayerSocketApi {
 
@@ -8,11 +9,17 @@ export class PlayerSocketApi {
    */
   _socket = null;
 
+  /**
+   * @type {MyPlayer}
+   * @private
+   */
+  _player = null;
+
   constructor() {
   }
 
   /**
-   * @param {Player} player
+   * @param {MyPlayer} player
    * @param {Socket} socket
    */
   attach( player, socket  ) {
@@ -20,6 +27,8 @@ export class PlayerSocketApi {
     this._socket = socket;
 
     // world api
+    socket.on('world.newObjects', data => this._newObjects(data));
+    socket.on('world.removedObjects', data => this._removedObjects(data));
     socket.on('world.changedObjects', data => this._changedObjects(data));
 
     // player api
@@ -30,11 +39,30 @@ export class PlayerSocketApi {
    * @param {Phaser.Point} direction
    * @param {number} traction
    */
-  directPlayerTo( direction, traction ) {
-    this._socket.emit('player.move', [ direction.x, direction.y, traction ]);
+  directPlayer( direction, traction ) {
+    let data = [ direction.x, direction.y, traction ].map(number => Number(number.toFixed(4)));
+    this._socket.emit('player.move', data);
   }
 
-  directPlayerToThrottled = throttle(this.directPlayerTo.bind(this), 100);
+  directPlayerThrottled = throttle(this.directPlayer.bind(this), 100);
+
+  /**
+   * @param {{ current: Array.<number>, objects: * }} data
+   * @private
+   */
+  _newObjects(data) {
+    let { current = [], objects = [] } = data;
+    this._player.addBodies( objects, current );
+  }
+
+  /**
+   * @param {{ current: Array.<number>, objects: * }} data
+   * @private
+   */
+  _removedObjects(data) {
+    let { current = [], objects = [] } = data;
+    this._player.removeBodies( objects, current );
+  }
 
   /**
    * @param {{ current: Array.<number>, objects: * }} data
@@ -42,21 +70,20 @@ export class PlayerSocketApi {
    */
   _changedObjects(data) {
     let { current = [], objects = [] } = data;
-    // todo: implement
+    this._player.changeBodies( objects, current );
   }
 
+  /**
+   * @param {[number, number, number]} data
+   * @private
+   */
   _changeCurrentPlayerPosition(data) {
-    let [ x, y, /*vx, vy,*/ dt ] = data;
+    let [ x, y ] = data;
     if (!this._player.hasBody) {
       return;
     }
-    let game = this._player.game;
-    game.add.tween(this._player.position).to({ x, y }, dt + 50, 'Linear', true);
-    this._player.state.pos.x = x;
-    this._player.state.pos.y = y;
-    //this._player.playerBody.velocity.set( 2000 * vx, 2000 * vy );
-    //this._player.state.vel.x = vx;
-    //this._player.state.vel.y = vy;
+    let player = this._player;
+    player.measureAvgVelocity( x, y );
   }
 
   /**
