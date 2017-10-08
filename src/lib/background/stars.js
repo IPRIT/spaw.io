@@ -5,16 +5,14 @@ import { Star } from "./star";
 
 export class StarsBackground extends Phaser.Group {
 
-  _starRadius = 10;
+  _starRadius = settings.starMaxRadius;
   _starMaxScale = 1;
   _starMinScale = .1;
 
-  _maxStarsNumber = 50;
+  _maxStarsNumber = settings.maxStarsNumber;
 
-  constructor(game) {
-    super(game);
-    this.fixedToCamera = true;
-    console.log(this);
+  constructor(game, parent) {
+    super(game, parent);
   }
 
   initialize() {
@@ -40,7 +38,7 @@ export class StarsBackground extends Phaser.Group {
 
   updateStars() {
     let game = this.game;
-    let scale = this.scale.x;
+    let scale = this.parent.scale.x;
     let cameraBounds = this._getCameraBounds();
     let stars = this.children;
 
@@ -58,10 +56,9 @@ export class StarsBackground extends Phaser.Group {
       * (scale - settings.minZoomScaling) / (settings.maxZoomScaling - settings.minZoomScaling)
     );
 
-    let rect = new Phaser.Rectangle(0, 0, cameraBounds.width, cameraBounds.height);
     for (let starIndex = 0; starIndex < stars.length; ++starIndex) {
       let star = stars[ starIndex ];
-      if (!rect.contains( star.x, star.y )
+      if (!cameraBounds.contains( star.x, star.y )
         || star._radius < minStarRadius
         || star._radius > maxStarRadius) {
         stars.splice(starIndex, 1);
@@ -73,8 +70,8 @@ export class StarsBackground extends Phaser.Group {
     for (let times = 0; times < starsNeeded; ++times) {
       this.createStar(
         new Phaser.Point(
-          game.rnd.realInRange(0, cameraBounds.width),
-          game.rnd.realInRange(0, cameraBounds.height)
+          cameraBounds.x + game.rnd.realInRange(0, cameraBounds.width),
+          cameraBounds.y + game.rnd.realInRange(0, cameraBounds.height)
         ),
         game.rnd.realInRange(minStarRadius / maxStarRadius, this._starMaxScale)
       );
@@ -82,17 +79,19 @@ export class StarsBackground extends Phaser.Group {
   }
 
   /**
-   * @param {number} scale
+   * Deletes all stars and creates new again
    */
-  setScale(scale) {
-    this._scale = scale;
-    this.game.add.tween(this.scale)
-      .to({ x: scale, y: scale }, 300, 'Linear', true);
+  forceUpdate() {
+    this.removeAll(true);
+    setTimeout(() => this.updateStars(), 200);
   }
 
+  /**
+   * Keeps stars in camera view
+   */
   keepInView() {
     let cameraBounds = this._getCameraBounds();
-    let view = new Phaser.Rectangle(0, 0, cameraBounds.width, cameraBounds.height);
+    let view = new Phaser.Rectangle(cameraBounds.x, cameraBounds.y, cameraBounds.width, cameraBounds.height);
     for (let index = 0; index < this.children.length; ++index) {
       let item = this.children[ index ];
       if (item.x > view.x + view.width + 5) {
@@ -110,11 +109,76 @@ export class StarsBackground extends Phaser.Group {
     }
   }
 
+  /**
+   * @param shiftX
+   * @param shiftY
+   */
   moveStars(shiftX, shiftY) {
+    let game = this.game.classInstance;
+    let worldSize = game.worldSize;
+    let player = game.me;
+    let camera = this.game.camera;
+
+    if (this._isPlayerCollidesWithLeftRightBounds(player, worldSize)
+      || this._isCameraReachedLeftRightBounds(camera, worldSize)) {
+      shiftX = 0;
+    }
+    if (this._isPlayerCollidesWithTopBottomBounds(player, worldSize)
+      || this._isCameraReachedTopBottomBounds(camera, worldSize)) {
+      shiftY = 0;
+    }
+
     for (let index = 0; index < this.children.length; ++index) {
       let item = this.children[ index ];
-      item.position.add(shiftX * item._scale * this._scale, shiftY * item._scale * this._scale);
+      item.position.add(shiftX * (1 - item._scale), shiftY * (1 - item._scale));
     }
+    this.keepInView();
+  }
+
+  /**
+   * @param player
+   * @param worldSize
+   * @return {boolean}
+   * @private
+   */
+  _isPlayerCollidesWithTopBottomBounds(player, worldSize) {
+    let playerHeight = player.height;
+    return player.y + playerHeight / 2 >= worldSize.y + worldSize.height - 10
+      || player.y - playerHeight / 2 <= worldSize.y + 10;
+  }
+
+  /**
+   * @param player
+   * @param worldSize
+   * @return {boolean}
+   * @private
+   */
+  _isPlayerCollidesWithLeftRightBounds(player, worldSize) {
+    let playerWidth = player.width;
+    return player.x + playerWidth / 2 >= worldSize.x + worldSize.width - 10
+      || player.x - playerWidth / 2 <= worldSize.x + 10;
+  }
+
+  /**
+   * @param camera
+   * @param worldSize
+   * @return {boolean}
+   * @private
+   */
+  _isCameraReachedTopBottomBounds(camera, worldSize) {
+    return camera.y <= worldSize.y + 10
+      || camera.y + camera.height >= worldSize.y + worldSize.height - 10;
+  }
+
+  /**
+   * @param camera
+   * @param worldSize
+   * @return {boolean}
+   * @private
+   */
+  _isCameraReachedLeftRightBounds(camera, worldSize) {
+    return camera.x <= worldSize.x + 10
+      || camera.x + camera.width >= worldSize.x + worldSize.width - 10;
   }
 
   /**
@@ -123,7 +187,7 @@ export class StarsBackground extends Phaser.Group {
    */
   _getCameraBounds() {
     let game = this.game;
-    let scale = this.scale.x;
+    let scale = this.parent.scale.x;
     let [ cameraWidth, cameraHeight ] = [ game.camera.width, game.camera.height ];
     let actualWorldViewWidth = cameraWidth / scale;
     let actualWorldViewHeight = cameraHeight / scale;

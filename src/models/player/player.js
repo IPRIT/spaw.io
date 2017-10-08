@@ -52,6 +52,12 @@ export class Player extends Phaser.Group {
   _md = { x: 0, y: 0 };
 
   /**
+   * @type {number}
+   * @private
+   */
+  _traction = 0;
+
+  /**
    * @param game
    * @param parentGroup
    * @param params
@@ -75,6 +81,7 @@ export class Player extends Phaser.Group {
     this._state = info.state;
     this._playerInfo = info.playerInfo;
     this._md = info.md;
+    this._traction = info.traction;
     if (info.playerInfo && info.playerInfo.faction) {
       this._faction = info.playerInfo.faction;
     }
@@ -83,12 +90,14 @@ export class Player extends Phaser.Group {
   /**
    * @param {*} info
    */
-  updateInfo(info) {
+  updateInfo(info, updatePosition = true) {
     this._size = info.size;
     this._md = info.md;
-    // workaround
-    this._state.angular = info.state.angular;
-    this._playerInfo = info.playerInfo;
+    this._traction = info.traction;
+    if (updatePosition) {
+      this._state.pos = info.pos;
+    }
+    this._playerInfo.score = info.score;
   }
 
   /**
@@ -108,21 +117,48 @@ export class Player extends Phaser.Group {
     if (!this.md) {
       return;
     }
-    let direction = new Phaser.Point(this.md.x, this.md.y);
     let game = this.game;
+    let direction = new Phaser.Point(this.md.x, this.md.y);
+    let oldRotation = this.playerBody.rotation;
     let rotation = (new Phaser.Point(-1, 0)).angle( direction, true ) * 2;
-    game.add.tween(this.playerBody)
-      .to({ rotation }, 100, 'Linear', true);
+
+    let animationTime = 1000 / 3;
+
+    if (Math.abs(oldRotation - rotation) > 180) {
+      // oldRotation -> -180/180 -> rotation:
+      let firstStartAt = oldRotation;
+      let firstStopAt = oldRotation < 0 ? -180 : 180;
+      let firstDelta = Math.abs(firstStopAt - firstStartAt);
+
+      let secondStartAt = rotation < 0 ? -180 : 180;
+      let secondStopAt = rotation;
+      let secondDelta = Math.abs(secondStopAt - secondStartAt);
+
+      let overallDistance = firstDelta + secondDelta;
+      let firstDistanceRatio = firstDelta / overallDistance;
+      let secondDistanceRatio = 1 - firstDistanceRatio;
+
+      let firstTween = game.add.tween(this.playerBody)
+        .to({ rotation: firstStopAt }, animationTime * firstDistanceRatio, 'Linear', true);
+      let secondTween = game.add.tween(this.playerBody)
+        .to({ rotation: secondStopAt }, animationTime * secondDistanceRatio, 'Linear');
+      firstTween.onComplete.add(() => {
+        this.playerBody.rotation = secondStartAt;
+        secondTween.start();
+      });
+    } else {
+      // oldRotation -> rotation:
+      game.add.tween(this.playerBody)
+        .to({ rotation }, animationTime, 'Linear', true);
+    }
   }
 
   /**
    * Updates player size
    */
   updateBodySize() {
-    let size = this.size;
-    let game = this.game;
-    let scale = size / 30;
-    game.add.tween(this.scale)
+    let scale = this._getScaleBySize();
+    this.game.add.tween(this.scale)
       .to({ x: scale, y: scale }, 400, 'Linear', true);
   }
 
@@ -147,8 +183,50 @@ export class Player extends Phaser.Group {
       this._state.pos.x,
       this._state.pos.y
     );
+    let scale = this._getScaleBySize();
+    this.scale.set( scale, scale );
     this.playerBody.rotation = this._state.angular.pos;
     game.physics.p2.enable(this.playerTriangle);
+  }
+
+  /**
+   * (!) This method only for remote players
+   *
+   * Setting next player position
+   *
+   * @param {number} avgVelocity Average velocity for player with 60 fps
+   */
+  directRemotePlayer(avgVelocity = this._avgVelocity) {
+    const frameRate = 60;
+    // x and y are normalized
+    let { x, y } = this._md;
+    let direction = new Phaser.Point(x, y);
+    let traction = this._traction;
+    let deltaX = (avgVelocity / frameRate) * x * traction;
+    let deltaY = (avgVelocity / frameRate) * y * traction;
+    let worldSize = this.gameClassInstance.worldSize;
+    // add world bounds constraints
+    let newX = Phaser.Math.clamp(this.x + deltaX, worldSize.x + this.width / 3, worldSize.x + worldSize.width - this.width / 3);
+    let newY = Phaser.Math.clamp(this.y + deltaY, worldSize.y + this.height / 3, worldSize.y + worldSize.height - this.height / 3);
+    this.position.set( newX, newY );
+
+    if (this.state) {
+      let realPosition = new Phaser.Point(this.state.pos.x, this.state.pos.y);
+      this.position.add(
+        (realPosition.x - this.position.x) / 50,
+        (realPosition.y - this.position.y) / 50
+      );
+    }
+  }
+
+  /**
+   * @return {number}
+   * @private
+   */
+  _getScaleBySize() {
+    let size = this.size;
+    const initSize = 30;
+    return size / initSize;
   }
 
   /**

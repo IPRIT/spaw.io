@@ -128,7 +128,6 @@ export class Game extends EventEmitter {
    * @param {number} scale
    */
   zoomToScale( scale ) {
-    console.log(scale);
     const maxZoom = settings.maxZoomScaling;
     const minZoom = settings.minZoomScaling;
     let previousZoom = this._worldScale;
@@ -137,8 +136,6 @@ export class Game extends EventEmitter {
       let game = this.game;
       let tweenFirst = game.add.tween(this._worldGroup.scale)
         .to({ x: this._worldScale, y: this._worldScale }, 300, 'Linear', true);
-      this._starsBackground.setScale( this._worldScale );
-      this._starsBackground.keepInView();
       tweenFirst.onComplete.addOnce(() => {
         this._starsBackground.updateStars();
       });
@@ -204,23 +201,8 @@ export class Game extends EventEmitter {
       this._player.viewPlayers.filter(player => {
         return player.id !== this._player.id;
       }).forEach(player => {
-        player.updateRotation();
+        player.directRemotePlayer( this._player.avgVelocity );
       });
-
-      if (this._player.hasBody && this._frames > 10) {
-        let shiftX = 8 * -direction.x * traction;
-        let shiftY = 8 * -direction.y * traction;
-        if (this._isPlayerCollidesWithTopBottomBounds()
-          || this._isCameraReachedTopBottomBounds()) {
-          shiftY = 0;
-        }
-        if (this._isPlayerCollidesWithLeftRightBounds()
-          || this._isCameraReachedLeftRightBounds()) {
-          shiftX = 0;
-        }
-        starsBackground.moveStars(shiftX, shiftY);
-        starsBackground.keepInView();
-      }
     }
   }
 
@@ -266,8 +248,7 @@ export class Game extends EventEmitter {
    * @private
    */
   _createStarsBackground() {
-    this._starsBackground = new StarsBackground(this._gameInstance);
-    setTimeout(() => this._starsBackground.initialize(), 100);
+    this._starsBackground = new StarsBackground(this._gameInstance, this.worldGroup);
   }
 
   /**
@@ -320,41 +301,11 @@ export class Game extends EventEmitter {
   }
 
   _resize() {
+    let optimalSize = this.optimalGameSize;
     let game = this._gameInstance;
     game.paused = this.isGamePaused;
-    let optimalSize = this.optimalGameSize;
     game.scale.setGameSize(optimalSize.width, optimalSize.height);
     game.scale.refresh();
-  }
-
-  _isPlayerCollidesWithTopBottomBounds() {
-    let player = this._player;
-    let playerHeight = this._player.height;
-    let worldSize = this._worldSize;
-    return player.y + playerHeight / 2 >= worldSize.y + worldSize.height - 10
-      || player.y - playerHeight / 2 <= worldSize.y + 10;
-  }
-
-  _isPlayerCollidesWithLeftRightBounds() {
-    let player = this._player;
-    let playerWidth = this._player.width;
-    let worldSize = this._worldSize;
-    return player.x + playerWidth / 2 >= worldSize.x + worldSize.width - 10
-      || player.x - playerWidth / 2 <= worldSize.x + 10;
-  }
-
-  _isCameraReachedTopBottomBounds() {
-    let camera = this._gameInstance.camera;
-    let worldSize = this._worldSize;
-    return camera.y <= worldSize.y + 10
-      || camera.y + camera.height >= worldSize.y + worldSize.height - 10;
-  }
-
-  _isCameraReachedLeftRightBounds() {
-    let camera = this._gameInstance.camera;
-    let worldSize = this._worldSize;
-    return camera.x <= worldSize.x + 10
-      || camera.x + camera.width >= worldSize.x + worldSize.width - 10;
   }
 
   /**

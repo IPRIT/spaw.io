@@ -29,7 +29,10 @@ export class PlayerSocketApi {
     // world api
     socket.on('world.newObjects', data => this._newObjects(data));
     socket.on('world.removedObjects', data => this._removedObjects(data));
+    // updating bodies except players
     socket.on('world.changedObjects', data => this._changedObjects(data));
+    // updating players
+    socket.on('world.updatePlayers', data => this._updatePlayers(data));
 
     // player api
     socket.on('player.position', data => this._changeCurrentPlayerPosition(data));
@@ -51,17 +54,16 @@ export class PlayerSocketApi {
    * @private
    */
   _newObjects(data) {
-    let { current = [], objects = [] } = data;
-    this._player.addBodies( objects, current );
+    let { c = [], o = [] } = data;
+    this._player.addBodies( o, c );
   }
 
   /**
-   * @param {{ current: Array.<number>, objects: * }} data
+   * @param {Array} data
    * @private
    */
   _removedObjects(data) {
-    let { current = [], objects = [] } = data;
-    this._player.removeBodies( objects, current );
+    this._player.removeBodies( data || [] );
   }
 
   /**
@@ -69,8 +71,16 @@ export class PlayerSocketApi {
    * @private
    */
   _changedObjects(data) {
-    let { current = [], objects = [] } = data;
-    this._player.changeBodies( objects, current );
+    let { c = [], o = [] } = data;
+    this._player.changeBodies( o, c );
+  }
+
+  /**
+   * @param data
+   * @private
+   */
+  _updatePlayers(data) {
+    this._player.updatePlayers( data );
   }
 
   /**
@@ -84,6 +94,8 @@ export class PlayerSocketApi {
     }
     let player = this._player;
     player.measureAvgVelocity( x, y );
+    player.state.pos.x = x;
+    player.state.pos.y = y;
   }
 
   /**

@@ -49,7 +49,7 @@ export class MyPlayer extends Player {
   _avgMeasuresNumber = 0;
 
   /**
-   * @type {Map.<*>}
+   * @type {Map.<number, Player|Feed|any>}
    * @private
    */
   _viewBodies = new Map();
@@ -79,9 +79,9 @@ export class MyPlayer extends Player {
     let game = this.game;
     game.camera.follow(this, Phaser.Camera.FOLLOW_LOCKON, .5, .5);
     setTimeout(() => {
-      this.gameClassInstance.starsBackground.updateStars();
+      this.gameClassInstance.starsBackground.initialize();
       game.camera.lerp.set(1, 1);
-    }, 300)
+    }, 500);
   }
 
   /**
@@ -90,14 +90,24 @@ export class MyPlayer extends Player {
    * @param {number} traction
    */
   directTo({ x, y }, traction) {
+    let game = this.gameClassInstance;
+    let starsGroup = game.starsBackground;
+
     const frameRate = 60;
     // x and y are normalized
     let deltaX = (this._avgVelocity / frameRate) * x * traction;
     let deltaY = (this._avgVelocity / frameRate) * y * traction;
     let worldSize = this.gameClassInstance.worldSize;
-    // add world bounds constraints
-    let newX = Phaser.Math.clamp(this.x + deltaX, worldSize.x + this.width / 3, worldSize.x + worldSize.width - this.width / 3);
-    let newY = Phaser.Math.clamp(this.y + deltaY, worldSize.y + this.height / 3, worldSize.y + worldSize.height - this.height / 3);
+
+    // Size = distance from center to any vertex of triangle.
+    // Opposite cathetus of 30 degree corner equals 1/2 of hypotenuse
+    let playerRadius = this.size * .5;
+    // world bounds constraints
+    let newX = Phaser.Math.clamp(
+      this.x + deltaX, worldSize.x + playerRadius, worldSize.x + worldSize.width - playerRadius);
+    let newY = Phaser.Math.clamp(
+      this.y + deltaY, worldSize.y + playerRadius, worldSize.y + worldSize.height - playerRadius);
+    starsGroup.moveStars(newX - this.x, newY - this.y);
     this.position.set( newX, newY );
 
     if (this.state) {
@@ -132,17 +142,16 @@ export class MyPlayer extends Player {
 
     if (!this._avgMeasuresNumber) {
       this._avgVelocity = newVelocity;
-    } else {
+      this._avgMeasuresNumber++;
+    } else if (deltaDistance > 40) {
       let avgVelocity = this._avgVelocity;
       this._avgVelocity = ( avgVelocity * this._avgMeasuresNumber + newVelocity ) / ( this._avgMeasuresNumber + 1 );
+      this._avgMeasuresNumber++;
+      this._lastPositionChangedAtMs = currentTimeMs;
     }
-    this._avgMeasuresNumber++;
-    if (this._avgMeasuresNumber > 1000) {
-      this._avgMeasuresNumber = 100;
+    if (this._avgMeasuresNumber > 200) {
+      this._avgMeasuresNumber = 20;
     }
-    this.state.pos.x = newX;
-    this.state.pos.y = newY;
-    this._lastPositionChangedAtMs = currentTimeMs;
   }
 
   /**
@@ -157,10 +166,9 @@ export class MyPlayer extends Player {
   }
 
   /**
-   * @param {Array.<*>} bodies
    * @param {Array.<number>} checkList
    */
-  removeBodies(bodies, checkList) {
+  removeBodies(checkList) {
     this._checkViewBodies( checkList );
   }
 
@@ -176,10 +184,45 @@ export class MyPlayer extends Player {
   }
 
   /**
-   * @param {*} body
+   * @param {Array.<Array.<number|any>>} updates
+   */
+  updatePlayers(updates) {
+    for (let i = 0; i < updates.length; ++i) {
+      this._updatePlayer( updates[ i ] );
+    }
+  }
+
+  /**
+   * @param {Array.<number|any>} data
    * @private
    */
-  _addViewBody(body) {
+  _updatePlayer(data) {
+    let update = this._decodeUpdatePlayerData( data );
+    /** @type {Player} */
+    let player = this._viewBodies.get( update.uid );
+    if (!player || !player.hasBody) {
+      return;
+    }
+    // check if the player is our and not update position if true
+    // because we have another event for this
+    let isMe = this.id === player.id;
+    player.updateInfo( update, !isMe );
+    player.updateBodySize();
+
+    if (isMe) {
+      let scale = this._approximateViewScaleByPlayerSize();
+      this.gameClassInstance.zoomToScale( scale );
+    } else {
+      player.updateRotation();
+    }
+  }
+
+  /**
+   * @param {*} data
+   * @private
+   */
+  _addViewBody(data) {
+    let body = this._decodeFullBodyData( data );
     let type = body.type;
     switch ( type ) {
       case 'feed': {
@@ -219,36 +262,26 @@ export class MyPlayer extends Player {
   _addPlayerViewBody(playerBody) {
     let { state, uid } = playerBody || {};
     let { pos } = state || {};
-    if (!pos || !uid) {
-      return;
-    }
-    if (this.id === uid || this._viewBodies.has(uid)) {
+    if (!pos || !uid
+      || this.id === uid
+      || this._viewBodies.has(uid)) {
       return;
     }
     let player = new Player(this.game, this.worldGroup);
     player.setInfo( playerBody );
     player.createBody();
+    console.log(pos.x, pos.y);
     player.position.set( pos.x, pos.y );
     player.updateBodySize();
-    //player.updateRotation();
     this._viewBodies.set( player.id, player );
+    console.log('Added', player);
   }
 
   /**
-   * @param {*} body
+   * @param {*} data
    * @private
    */
-  _changeViewBody(body) {
-    let type = body.type;
-    switch ( type ) {
-      case 'player': {
-        this._changePlayerBody( body );
-        break;
-      }
-      default: {
-        console.warn('Unsupported body type:', body);
-      }
-    }
+  _changeViewBody(data) {
   }
 
   /**
@@ -275,7 +308,6 @@ export class MyPlayer extends Player {
       this.gameClassInstance.zoomToScale( scale );
     } else {
       player.setPosition( playerBody.state );
-      //player.updateRotation();
     }
   }
 
@@ -318,11 +350,10 @@ export class MyPlayer extends Player {
    * @private
    */
   _removePlayerBody(player) {
-    console.log(player);
     if (!player || !player.id) {
       return;
     }
-    console.log(player);
+    console.log('Removed', player);
     this.worldGroup.remove( player );
     player.destroy();
   }
@@ -353,6 +384,116 @@ export class MyPlayer extends Player {
   _createPlayersControl() {
     this._playerControls = new PlayerControls( this );
     this._playerControls.initControls();
+  }
+
+  /**
+   * @param data
+   * @private
+   */
+  _decodeFullBodyData( data) {
+    let [ type ] = data;
+    switch ( type ) {
+      case 'player': {
+        return this._decodeFullPlayerData( data );
+      }
+      case 'feed': {
+        return this._decodeFullFeedData( data );
+      }
+    }
+  }
+
+  /**
+   * @param data
+   * @private
+   */
+  _decodeFullPlayerData(data) {
+    let [
+      type, uid, size,
+      verticesX1, verticesY1,
+      verticesX2, verticesY2,
+      verticesX3, verticesY3,
+      mdX, mdY,
+      traction,
+      positionX, positionY,
+      angularPos, angularVel, angularAcc,
+      bodyId, userNickname, userType,
+      playerScore,
+      factionId, factionName, factionPlayersNumber, factionMaxPlayersNumber,
+      factionScore
+    ] = data;
+    return {
+      type, uid, size,
+      vertices: [{
+        x: verticesX1, y: verticesY1
+      }, {
+        x: verticesX2, y: verticesY2
+      }, {
+        x: verticesX3, y: verticesY3
+      }],
+      md: { x: mdX, y: mdY },
+      traction,
+      state: {
+        pos: {
+          x: positionX, y: positionY
+        },
+        angular: {
+          pos: angularPos,
+          vel: angularVel,
+          acc: angularAcc
+        }
+      },
+      playerInfo: {
+        bodyId, userNickname, userType,
+        score: playerScore,
+        faction: factionId && {
+          id: factionId,
+          name: factionName,
+          playersNumber: factionPlayersNumber,
+          maxPlayersNumber: factionMaxPlayersNumber,
+          score: factionScore
+        }
+      }
+    }
+  }
+
+  /**
+   * @param data
+   * @private
+   */
+  _decodeUpdatePlayerData(data) {
+    let [
+      uid, size,
+      mdX, mdY,
+      traction,
+      positionX, positionY,
+      playerScore
+    ] = data;
+    return {
+      uid, size,
+      md: { x: mdX, y: mdY },
+      traction,
+      pos: { x: positionX, y: positionY },
+      score: playerScore
+    }
+  }
+
+  /**
+   * @param data
+   * @private
+   */
+  _decodeFullFeedData(data) {
+    let [
+      type, uid, radius,
+      positionX, positionY
+    ] = data;
+    return {
+      type, uid, radius,
+      state: {
+        pos: {
+          x: positionX, y: positionY
+        }
+      }
+    }
   }
 
   /**
