@@ -159,7 +159,7 @@ export class Player extends Phaser.Group {
   updateBodySize() {
     let scale = this._getScaleBySize();
     this.game.add.tween(this.scale)
-      .to({ x: scale, y: scale }, 400, 'Linear', true);
+      .to({ x: scale, y: scale }, 400, Phaser.Easing.Quadratic.InOut, true);
   }
 
   /**

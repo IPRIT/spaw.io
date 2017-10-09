@@ -316,6 +316,11 @@ export class MyPlayer extends Player {
    * @private
    */
   _checkViewBodies(list) {
+    list.reduce((uid, value, index) => {
+      uid += value;
+      list[ index ] = uid;
+      return uid;
+    }, 0);
     let viewBodiesArray = [ ...this._viewBodies.values() ];
     for (let i = 0; i < viewBodiesArray.length; ++i) {
       let body = viewBodiesArray[ i ];
