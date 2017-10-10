@@ -353,6 +353,9 @@ export class MyPlayer extends Player {
    * @private
    */
   _removeFeedBody(feed) {
+    if (!this.game) {
+      return;
+    }
     let feedsGroup = this.gameClassInstance.feedsGroup;
     feedsGroup.removeFeedById( feed.id );
   }
