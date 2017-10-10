@@ -66,8 +66,8 @@ export class MyPlayer extends Player {
     this._createSocketApi();
     this._createPlayersControl();
     this._retrieveInfo().then(() => {
-      this.createBody();
-      this._viewBodies.set( this.id, this );
+      //this.createBody();
+      //this._viewBodies.set( this.id, this );
     });
   }
 
@@ -262,19 +262,26 @@ export class MyPlayer extends Player {
   _addPlayerViewBody(playerBody) {
     let { state, uid } = playerBody || {};
     let { pos } = state || {};
-    if (!pos || !uid
-      || this.id === uid
-      || this._viewBodies.has(uid)) {
+    if (!pos || !uid) {
+      return;
+    }
+    if (this.id === uid) {
+      this.setInfo( playerBody );
+      this.createBody();
+      this.position.set( pos.x, pos.y );
+      this.updateBodySize(true);
+      this._viewBodies.set( this.id, this );
+      return;
+    } else if (this._viewBodies.has(uid)) {
       return;
     }
     let player = new Player(this.game, this.worldGroup);
     player.setInfo( playerBody );
     player.createBody();
-    console.log(pos.x, pos.y);
     player.position.set( pos.x, pos.y );
-    player.updateBodySize();
+    player.updateBodySize(true);
+    player.updateRotation(true);
     this._viewBodies.set( player.id, player );
-    console.log('Added', player);
   }
 
   /**
@@ -358,7 +365,6 @@ export class MyPlayer extends Player {
     if (!player || !player.id) {
       return;
     }
-    console.log('Removed', player);
     this.worldGroup.remove( player );
     player.destroy();
   }
@@ -426,7 +432,7 @@ export class MyPlayer extends Player {
       factionId, factionName, factionPlayersNumber, factionMaxPlayersNumber,
       factionScore
     ] = data;
-    return {
+    let decoded = {
       type, uid, size,
       vertices: [{
         x: verticesX1, y: verticesY1
@@ -458,7 +464,9 @@ export class MyPlayer extends Player {
           score: factionScore
         }
       }
-    }
+    };
+    console.log(decoded);
+    return decoded;
   }
 
   /**

@@ -2,7 +2,6 @@ import './utils/polyfills';
 import ds from 'fm-localstorage';
 import { Game } from "./game";
 import { SocketIoManager } from "./lib/socket.io/socket-manager";
-import { MyPlayer } from "./models/player/my-player";
 
 document.addEventListener('DOMContentLoaded', () => {
   entryPoint();
@@ -17,8 +16,7 @@ async function entryPoint() {
   game.register({
     gameType: "quick",
     region: "eu-west",
-    userNickname: "IPRIT",
-    token: 'cf393375ad24d8166bcc975b209cb2768cf0ca3e1132e936e8475743771e8c8d193db1a7ef276b5ed4597a7bc9d9a6eb'
+    userNickname: "IPRIT " + (Math.random() > .5 ? Math.random().toFixed(5) : '')
   }).then(session => {
     _session = session;
     return socketIoManager.joinServer({
@@ -29,10 +27,14 @@ async function entryPoint() {
     return socketIoManager.joinArena({ gameToken });
   }).then(session => {
     console.log('Player joined the game!', session);
-    return socketIoManager.getGameStatus();
-  }).then(gameStatus => {
+    return Promise.all([
+      socketIoManager.getGameStatus(),
+      socketIoManager.getWorldStatus()
+    ]);
+  }).then(([ gameStatus, worldStatus ]) => {
     console.log('Game status:', gameStatus);
-    game.init(gameStatus);
+    console.log('World status:', worldStatus);
+    game.init({ gameStatus, worldStatus });
     let factionId = gameStatus.factions[0].id;
     return socketIoManager.joinFaction( factionId );
   }).then(faction => {

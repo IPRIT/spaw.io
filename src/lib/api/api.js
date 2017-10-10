@@ -5,10 +5,9 @@ import * as settings from '../../config';
  * @param params
  */
 export async function register(params) {
-  let { token } = params;
   let protocol = settings.apiSecure ? 'https' : 'http';
   let endpoint = `${protocol}://${settings.apiServerUri}/api/game/register`;
-  let response = await _get(endpoint, { token });
+  let response = await _get(endpoint, params);
   return response.data;
 }
 

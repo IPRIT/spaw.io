@@ -80,6 +80,16 @@ export class SocketIoManager extends EventEmitter {
   }
 
   /**
+   * @return {Promise}
+   */
+  getWorldStatus() {
+    this._socket.emit('world.status');
+    return new Promise((resolve, reject) => {
+      this._socket.once('world.status', data => resolve(data));
+    });
+  }
+
+  /**
    * @param {number} factionId
    * @return {Promise}
    */

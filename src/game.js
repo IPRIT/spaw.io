@@ -75,16 +75,24 @@ export class Game extends EventEmitter {
    */
   _gameStatus = null;
 
+  /**
+   * @type {*}
+   * @private
+   */
+  _worldStatus = null;
+
   constructor() {
     super();
     this._createGameInstance();
   }
   
-  init(gameStatus) {
+  init({ gameStatus, worldStatus }) {
     this._gameStatus = gameStatus;
+    this._worldStatus = worldStatus;
     this._createWorld( gameStatus );
     this._createStarsBackground();
     this._createFeedsLayer();
+    this._createMap( worldStatus );
     this._attachEvents();
   }
   
@@ -271,6 +279,27 @@ export class Game extends EventEmitter {
    */
   _createFeedsLayer() {
     this._feedsGroup = new FeedsGroup(this.game, this._worldGroup);
+  }
+
+  /**
+   * @private
+   */
+  _createMap(worldStatus) {
+    let mapGroup = this.game.add.group(this.worldGroup, 'Map');
+    for (let polygon of worldStatus.territories) {
+      let poly = new Phaser.Polygon(polygon.polygon);
+      let graphics = this.game.add.graphics(0, 0, mapGroup);
+      graphics.lineStyle(10, Math.floor( Math.random() * 16777215 ), .5);
+      graphics.drawPolygon(poly.points);
+      //graphics.endFill();
+
+      graphics.lineStyle(5, Math.floor( Math.random() * 16777215 ), .5);
+      graphics.beginFill( Math.floor( Math.random() * 16777215 ) );
+      graphics.drawCircle( polygon.planet.position.x, polygon.planet.position.y, polygon.planet.radius );
+      graphics.endFill();
+
+      graphics.alpha = .3;
+    }
   }
 
   /**

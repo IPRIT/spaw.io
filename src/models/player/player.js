@@ -113,7 +113,7 @@ export class Player extends Phaser.Group {
   /**
    * Updating rotation
    */
-  updateRotation() {
+  updateRotation(withoutAnimation = false) {
     if (!this.md) {
       return;
     }
@@ -121,6 +121,10 @@ export class Player extends Phaser.Group {
     let direction = new Phaser.Point(this.md.x, this.md.y);
     let oldRotation = this.playerBody.rotation;
     let rotation = (new Phaser.Point(-1, 0)).angle( direction, true ) * 2;
+
+    if (withoutAnimation) {
+      return this.playerBody.rotation = rotation;
+    }
 
     let animationTime = 1000 / 3;
 
@@ -143,7 +147,9 @@ export class Player extends Phaser.Group {
       let secondTween = game.add.tween(this.playerBody)
         .to({ rotation: secondStopAt }, animationTime * secondDistanceRatio, 'Linear');
       firstTween.onComplete.add(() => {
-        this.playerBody.rotation = secondStartAt;
+        if (this.playerTriangle && this.playerBody) {
+          this.playerBody.rotation = secondStartAt;
+        }
         secondTween.start();
       });
     } else {
@@ -156,10 +162,14 @@ export class Player extends Phaser.Group {
   /**
    * Updates player size
    */
-  updateBodySize() {
+  updateBodySize(withoutAnimation = false) {
     let scale = this._getScaleBySize();
-    this.game.add.tween(this.scale)
-      .to({ x: scale, y: scale }, 400, Phaser.Easing.Quadratic.InOut, true);
+    if (withoutAnimation) {
+      this.scale.set( scale, scale );
+    } else {
+      this.game.add.tween(this.scale)
+        .to({ x: scale, y: scale }, 200, 'Linear', true);
+    }
   }
 
   /**
@@ -179,10 +189,20 @@ export class Player extends Phaser.Group {
     triangle.drawCircle(vertices[0].x, vertices[0].y, 3);
     triangle.endFill();
 
-    this.position.set(
-      this._state.pos.x,
-      this._state.pos.y
-    );
+    let textStyle = {
+      //align: 'center',
+      font: "Bold 100px Impact",
+      fill: '#ffffff',
+      fontSize: 100,
+      fontWeight: 'bold',
+      stroke: '#000000',
+      strokeThickness: 5
+    };
+    let textGroup = game.add.group(this, 'Name');
+    let text = this._text = game.add.text(0, 0, this._playerInfo.userNickname + ` (${this.id})`, textStyle, textGroup);
+    text.anchor.set(0.5);
+    this.updateTextSize();
+
     let scale = this._getScaleBySize();
     this.scale.set( scale, scale );
     this.playerBody.rotation = this._state.angular.pos;
@@ -220,12 +240,23 @@ export class Player extends Phaser.Group {
   }
 
   /**
+   * @private
+   */
+  updateTextSize() {
+    let size = 30;
+    let triangleWidth = 2 * Math.sqrt(size * size - (size / 2) * (size / 2));
+    triangleWidth += triangleWidth / 2;
+    let textWidth = this._text.width / this._text.scale.x;
+    this._text.scale.set(triangleWidth / textWidth, triangleWidth / textWidth);
+  }
+
+  /**
    * @return {number}
    * @private
    */
   _getScaleBySize() {
     let size = this.size;
-    const initSize = 30;
+    const initSize = 30; // radius * 2
     return size / initSize;
   }
 
