@@ -220,7 +220,6 @@ export class Player extends Phaser.Group {
     const frameRate = 60;
     // x and y are normalized
     let { x, y } = this._md;
-    let direction = new Phaser.Point(x, y);
     let traction = this._traction;
     let deltaX = (avgVelocity / frameRate) * x * traction;
     let deltaY = (avgVelocity / frameRate) * y * traction;
@@ -228,13 +227,14 @@ export class Player extends Phaser.Group {
     // add world bounds constraints
     let newX = Phaser.Math.clamp(this.x + deltaX, worldSize.x + this.width / 3, worldSize.x + worldSize.width - this.width / 3);
     let newY = Phaser.Math.clamp(this.y + deltaY, worldSize.y + this.height / 3, worldSize.y + worldSize.height - this.height / 3);
+    let distanceDeviation = this.position.distance(new Phaser.Point( newX, newY ));
     this.position.set( newX, newY );
 
     if (this.state) {
       let realPosition = new Phaser.Point(this.state.pos.x, this.state.pos.y);
       this.position.add(
-        (realPosition.x - this.position.x) / 50,
-        (realPosition.y - this.position.y) / 50
+        (realPosition.x - this.position.x) / (75 - Math.min(70, distanceDeviation)),
+        (realPosition.y - this.position.y) / (75 - Math.min(70, distanceDeviation))
       );
     }
   }

@@ -20,7 +20,7 @@ export async function register(params) {
 async function _get(endpoint, params = {}) {
   return axios.get(endpoint, {
     params,
-    validateStatus: (status) => {
+    validateStatus(status) {
       return status >= 200 && status < 300; // default
     }
   });
@@ -34,7 +34,7 @@ async function _get(endpoint, params = {}) {
 async function _post(endpoint, data = {}) {
   return axios.get(endpoint, {
     params,
-    validateStatus: (status) => {
+    validateStatus(status) {
       return status >= 200 && status < 300; // default
     }
   });

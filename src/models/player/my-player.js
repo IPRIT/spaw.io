@@ -108,13 +108,14 @@ export class MyPlayer extends Player {
     let newY = Phaser.Math.clamp(
       this.y + deltaY, worldSize.y + playerRadius, worldSize.y + worldSize.height - playerRadius);
     starsGroup.moveStars(newX - this.x, newY - this.y);
+    let distanceDeviation = this.position.distance(new Phaser.Point( newX, newY ));
     this.position.set( newX, newY );
 
     if (this.state) {
       let realPosition = new Phaser.Point(this.state.pos.x, this.state.pos.y);
       this.position.add(
-        (realPosition.x - this.position.x) / 50,
-        (realPosition.y - this.position.y) / 50
+        (realPosition.x - this.position.x) / (75 - Math.min(70, distanceDeviation)),
+        (realPosition.y - this.position.y) / (75 - Math.min(70, distanceDeviation))
       );
     }
   }
